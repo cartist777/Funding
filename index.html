@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5학년 2반 그림 펀딩 플랫폼</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0}
+header{background:#4f46e5;color:#fff;padding:16px;position:sticky;top:0;text-align:center}
+header h2{margin:0;font-size:28px;text-align:center}
+.container{max-width:1200px;margin:auto;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:768px){.grid{grid-template-columns:repeat(2,1fr)}}
+.card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);text-align:center}
+.card-title{font-size:20px;font-weight:bold;margin:12px 0;text-align:center}
+.card img{width:100%;aspect-ratio:1/1;object-fit:cover}
+.info{padding:12px}
+button{background:#4f46e5;color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;margin:4px}
+.rank{background:#fff;padding:12px;border-radius:12px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<header>
+<div class="top">
+<h2>🎨 5학년 2반 그림 펀딩 플랫폼</h2>
+<div>
+  <input type="text" id="usernameInput" placeholder="이름 입력">
+  <button id="loginBtn">로그인</button>
+  <span id="userInfo"></span>
+  <span id="fundInfo"></span>
+</div>
+</div>
+</header>
+
+<div class="container">
+<div class="rank">
+<h3>🏆 TOP 3</h3>
+<div id="top3"></div>
+</div>
+<div id="gallery" class="grid"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+const firebaseConfig = {
+ apiKey:"AIzaSyCz12idSMrOXQaVeUoIlGN4lOxgBovtsXQ",
+ authDomain:"classvoting-a0e95.firebaseapp.com",
+ projectId:"classvoting-a0e95",
+ storageBucket:"classvoting-a0e95.firebasestorage.app",
+ messagingSenderId:"384140463404",
+ appId:"1:384140463404:web:44cd9553316a622f4d3089",
+ measurementId:"G-14JV67N5V0"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let currentUser = null;
+let currentFund = 0;
+const MAX_FUND = 1000;
+
+// 로그인 버튼 클릭
+loginBtn.onclick = async () => {
+  const name = usernameInput.value.trim();
+  if (!name) {
+    alert("이름을 입력하세요!");
+    return;
+  }
+  currentUser = name;
+  userInfo.innerText = "사용자: " + name;
+
+  const userRef = doc(db, "users", name);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    await setDoc(userRef, { name, funded: 0 });
+    currentFund = 0;
+  } else {
+    currentFund = snap.data().funded || 0;
+  }
+  fundInfo.innerText = "총 펀딩: " + currentFund + "원 / 최대 " + MAX_FUND + "원";
+};
+
+function renderCard(id,data){
+ return `
+ <div class="card">
+   <div class="card-title">${data.title || ('작품 '+id)}</div>
+   <img src="${data.image || 'https://raw.githubusercontent.com/cartist777/Voting/main/images/default.jpg'}">
+   <div class="info">
+     <div>${data.student||''}</div>
+     <p>${data.description||''}</p>
+     <b>💰 ${data.funding||0} 원</b><br><br>
+     <button onclick="fund('${id}',100)">100원</button>
+     <button onclick="fund('${id}',200)">200원</button>
+     <button onclick="fund('${id}',500)">500원</button>
+     <button onclick="fund('${id}',1000)">1000원</button>
+   </div>
+ </div>`;
+}
+
+window.fund = async(id,amount)=>{
+ if (!currentUser) {
+   alert("먼저 이름으로 로그인하세요!");
+   return;
+ }
+
+ if (currentFund + amount > MAX_FUND) {
+   alert("최대 펀딩 한도(1000원)를 초과할 수 없습니다.");
+   return;
+ }
+
+ await updateDoc(doc(db,"artworks",id),{funding:increment(amount)});
+ await updateDoc(doc(db,"users",currentUser),{funded:increment(amount)});
+
+ currentFund += amount;
+ fundInfo.innerText = "총 펀딩: " + currentFund + "원 / 최대 " + MAX_FUND + "원";
+ alert(amount+" 원 펀딩 완료!");
+};
+
+onSnapshot(collection(db,"artworks"),(snap)=>{
+ let html="";
+ let ranking=[];
+
+ snap.forEach(d=>{
+   const data=d.data();
+   html+=renderCard(d.id,data);
+   ranking.push({...data,id:d.id});
+ });
+
+ gallery.innerHTML=html;
+
+ ranking.sort((a,b)=>(b.funding||0)-(a.funding||0));
+
+ top3.innerHTML=ranking.slice(0,3)
+ .map((x,i)=>`${i+1}위 ${x.title} (${x.funding||0}원)`)
+ .join("<br>");
+});
+</script>
+</body>
+</html>
